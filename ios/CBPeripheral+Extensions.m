@@ -108,7 +108,7 @@ static char ADVERTISEMENT_RSSI_IDENTIFER;
   // Convert to String keys with Array Buffer values
   NSMutableDictionary *serviceData = [dict objectForKey:CBAdvertisementDataServiceDataKey];
   if (serviceData) {
-    NSLog(@"%@", serviceData);
+    // NSLog(@"%@", serviceData);
     
     for (CBUUID *key in [serviceData allKeys]) {
         if ([serviceData objectForKey:key]) {
