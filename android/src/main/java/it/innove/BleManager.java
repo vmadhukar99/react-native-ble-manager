@@ -409,6 +409,18 @@ class BleManager extends ReactContextBaseJavaModule implements ActivityEventList
 			callback.invoke("Peripheral not found", null);
 	}
 
+	@ReactMethod
+	public void invokeOtaOnL2cap(String deviceUUID, byte[] imageFileData, Callback callback) {
+		Log.d(LOG_TAG, "invokeOtaOnL2cap: " + deviceUUID);
+		Peripheral peripheral = peripherals.get(deviceUUID);
+		if (peripheral != null) {
+			L2capSocket l2capSocket = new L2capSocket(peripheral, imageFileData, callback);
+			l2capSocket.execute();
+		} else {
+			callback.invoke("Peripheral not found", null);
+		}
+	}
+
 	private Peripheral savePeripheral(BluetoothDevice device) {
 		String address = device.getAddress();
 		synchronized (peripherals) {

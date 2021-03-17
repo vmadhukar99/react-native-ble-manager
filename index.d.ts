@@ -86,6 +86,11 @@ declare module "react-native-ble-manager" {
 
   export function readRSSI(peripheralID: string): Promise<void>;
 
+  export function invokeOtaOnL2cap(
+    peripheralID: string,
+    imageFileData: number[]
+    ): Promise<void>;
+
   export function getConnectedPeripherals(
     serviceUUIDs: string[]
   ): Promise<Peripheral[]>;
