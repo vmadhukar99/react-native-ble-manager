@@ -8,8 +8,12 @@ import android.util.Log;
 
 import com.facebook.react.bridge.Arguments;
 import com.facebook.react.bridge.Callback;
+import com.facebook.react.bridge.ReactContext;
 import com.facebook.react.bridge.WritableMap;
+import com.facebook.react.modules.core.RCTNativeAppEventEmitter;
 
+import java.io.File;
+import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -18,7 +22,7 @@ import java.lang.reflect.InvocationTargetException;
 
 import static android.content.ContentValues.TAG;
 
-public class L2capSocket implements Runnable {
+public class L2capSocket {
 
   private int percentage;
 
@@ -32,9 +36,13 @@ public class L2capSocket implements Runnable {
 
   private byte[] imageFileData;
 
+  private String filePath;
+
   private Peripheral peripheral;
 
   private Callback callback;
+
+  private ReactContext reactContext;
 
   private BluetoothSocket bluetoothSocket;
 
@@ -42,32 +50,25 @@ public class L2capSocket implements Runnable {
 
   private InputStream inputStream;
 
-  protected Thread workerThread;
-
-  private int threadPriority = Thread.NORM_PRIORITY;
-
-  public L2capSocket(Peripheral peripheral, byte[] imageFileData, Callback callback) {
+  public L2capSocket(Peripheral peripheral, String filePath, ReactContext reactContext, Callback callback) {
     this.peripheral = peripheral;
-    this.imageFileData = imageFileData;
+    this.filePath = filePath;
+    this.reactContext = reactContext;
     this.callback  = callback;
   }
 
   public void execute() {
-    workerThread = new Thread(this);
-    workerThread.setPriority(threadPriority);
-    workerThread.start();
-  }
-
-  @Override
-  public void run() {
-    try {
-      openL2capBleSocket();
-      readStreamingData();
-    } catch (Exception ex) {
-      Log.e(TAG, "L2CAP Socket Error - " + ex.getMessage());
-      callback.invoke("ota failed");
-      this.close();
-    }
+    new Thread( new Runnable() { @Override public void run() {
+      try {
+        setImageFilePath(filePath);
+        openL2capBleSocket();
+        readStreamingData();
+      } catch (Exception ex) {
+        Log.e(TAG, "L2CAP Socket Error - " + ex.getMessage());
+        callback.invoke("ota failed");
+        close();
+      }
+    }}).start();
   }
 
   private void openL2capBleSocket() throws InvocationTargetException, NoSuchMethodException, InstantiationException, IOException, IllegalAccessException {
@@ -124,7 +125,6 @@ public class L2capSocket implements Runnable {
     Log.d(TAG, "No of Bytes completed - " + count);
 
     if (remainingBytes == 0) {
-      // doStepSendEndCommand();
       callback.invoke(null, "success");
       this.close();
       return false;
@@ -155,7 +155,7 @@ public class L2capSocket implements Runnable {
           progress = (x * 100) / (imageFileData.length);
         }
         Log.i(TAG, "Progress bar value " + progress);
-        this.onProgress(progress);
+        onProgress(progress);
 
         remainingBytes = imageFileData.length - blockStartByte;
         Log.i(TAG, "remainingBytes: " + remainingBytes);
@@ -175,9 +175,28 @@ public class L2capSocket implements Runnable {
   private void onProgress(int progress) {
     WritableMap map = Arguments.createMap();
     map.putString("peripheral", peripheral.getDevice().getAddress());
-    map.putInt("DOWNLOAD_PROGRESS", progress);
-    this.peripheral.sendEvent("BleManagerL2capDownloadProgress", map);
+    map.putInt("progress", progress);
+    reactContext.getJSModule(RCTNativeAppEventEmitter.class).emit("BleManagerL2capDownloadProgress", map);
   }
+
+  private void setImageFilePath(String url) {
+    Log.i(TAG, "setImageFilePath - " + url);
+    File file = new File(url);
+    try {
+        // create FileInputStream object
+        FileInputStream fin = new FileInputStream(file);
+        byte fileContent[] = new byte[(int) file.length()];
+        // Reads up to certain bytes of data from this input stream into an array of bytes.
+        fin.read(fileContent);
+        fin.close();
+        this.imageFileData = fileContent;
+        Log.i(TAG, "File Length "+imageFileData.length);
+    }
+    catch (Exception ex) {
+        // throw ex;
+        ex.printStackTrace();
+    }
+}
 
   private void close() {
     try {

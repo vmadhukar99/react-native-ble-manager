@@ -410,11 +410,11 @@ class BleManager extends ReactContextBaseJavaModule implements ActivityEventList
 	}
 
 	@ReactMethod
-	public void invokeOtaOnL2cap(String deviceUUID, byte[] imageFileData, Callback callback) {
+	public void invokeOtaOnL2cap(String deviceUUID, String filePath, Callback callback) {
 		Log.d(LOG_TAG, "invokeOtaOnL2cap: " + deviceUUID);
 		Peripheral peripheral = peripherals.get(deviceUUID);
 		if (peripheral != null) {
-			L2capSocket l2capSocket = new L2capSocket(peripheral, imageFileData, callback);
+			L2capSocket l2capSocket = new L2capSocket(peripheral, filePath, reactContext, callback);
 			l2capSocket.execute();
 		} else {
 			callback.invoke("Peripheral not found", null);

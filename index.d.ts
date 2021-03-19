@@ -88,8 +88,8 @@ declare module "react-native-ble-manager" {
 
   export function invokeOtaOnL2cap(
     peripheralID: string,
-    imageFileData: number[]
-    ): Promise<void>;
+    filePath: string
+  ): Promise<void>;
 
   export function getConnectedPeripherals(
     serviceUUIDs: string[]

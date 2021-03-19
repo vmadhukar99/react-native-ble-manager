@@ -36,6 +36,18 @@ class BleManager {
     });
   }
 
+  invokeOtaOnL2cap(peripheralId, filePath) {
+    return new Promise((fulfill, reject) => {
+      bleManager.invokeOtaOnL2cap(peripheralId, filePath, (error, data) => {
+        if (error) {
+          reject(error);
+        } else {
+          fulfill(data);
+        }
+      });
+    });
+  }
+
   refreshCache(peripheralId) {
     return new Promise((fulfill, reject) => {
       bleManager.refreshCache(peripheralId, (error, result) => {
