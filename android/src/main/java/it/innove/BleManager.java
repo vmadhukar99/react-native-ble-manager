@@ -409,6 +409,66 @@ class BleManager extends ReactContextBaseJavaModule implements ActivityEventList
 			callback.invoke("Peripheral not found", null);
 	}
 
+	@ReactMethod
+	public void openL2capChannel(String deviceUUID, int psm, Callback callback) {
+		Log.d(LOG_TAG, "psm: " + psm);
+		Log.d(LOG_TAG, "openL2capChannel: " + deviceUUID);
+		Peripheral peripheral = peripherals.get(deviceUUID);
+		if (peripheral != null) {
+			peripheral.openL2capChannel(psm, callback);
+		} else {
+			callback.invoke("Peripheral not found");
+		}
+	}
+
+	@ReactMethod
+	public void readFromStream(String deviceUUID, int byteSize, Callback callback) {
+		Log.d(LOG_TAG, "readFromStream: " + deviceUUID);
+		Log.d(LOG_TAG, "readFromStream byteSize: " + byteSize);
+		Peripheral peripheral = peripherals.get(deviceUUID);
+		if (peripheral != null) {
+			if (peripheral.isL2capChannelOpned()) {
+				byte buffer[] = new byte[byteSize];
+				peripheral.readFromStream(buffer, callback);
+			} else {
+				callback.invoke("L2cap Channel is not opend");
+			}
+		} else {
+			callback.invoke("Peripheral not found");
+		}
+	}
+
+	@ReactMethod
+	public void writeToStream(String deviceUUID, ReadableArray message, int par1, int par2, Callback callback) {
+		Log.d(LOG_TAG, "writeToStream: $$$ " + deviceUUID);
+		Peripheral peripheral = peripherals.get(deviceUUID);
+		if (peripheral != null) {
+			if (peripheral.isL2capChannelOpned()) {
+				byte[] decoded = new byte[message.size()];
+				for (int i = 0; i < message.size(); i++) {
+					decoded[i] = new Integer(message.getInt(i)).byteValue();
+				}
+				peripheral.writeToStream(decoded, par1, par2, callback);
+			} else {
+				callback.invoke("L2cap Channel is not opend");
+			}
+		} else {
+			callback.invoke("Peripheral not found");
+		}
+	}
+
+	@ReactMethod
+	public void closeL2capChannel(String deviceUUID, Callback callback) {
+		Log.d(LOG_TAG, "closeL2capChannel: " + deviceUUID);
+		Peripheral peripheral = peripherals.get(deviceUUID);
+		if (peripheral != null) {
+				peripheral.closeL2capChannel();
+				callback.invoke(null, null);
+		} else {
+			callback.invoke("Peripheral not found");
+		}
+	}
+
 	private Peripheral savePeripheral(BluetoothDevice device) {
 		String address = device.getAddress();
 		synchronized (peripherals) {

@@ -86,6 +86,27 @@ declare module "react-native-ble-manager" {
 
   export function readRSSI(peripheralID: string): Promise<void>;
 
+  export function openL2capChannel(
+    peripheralID: string,
+    psm: number
+  ): Promise<void>;
+
+  export function readFromStream(
+    peripheralID: string,
+    byteSize: number
+  ): Promise<void>;
+
+  export function writeToStream(
+    peripheralID: string,
+    data: any,
+    par1: number,
+    par2: number
+  ): Promise<void>;
+
+  export function closeL2capChannel(
+    peripheralID: string
+  ): Promise<void>;
+
   export function getConnectedPeripherals(
     serviceUUIDs: string[]
   ): Promise<Peripheral[]>;

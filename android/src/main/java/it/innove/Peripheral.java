@@ -8,8 +8,11 @@ import android.bluetooth.BluetoothGattCharacteristic;
 import android.bluetooth.BluetoothGattDescriptor;
 import android.bluetooth.BluetoothGattService;
 import android.bluetooth.BluetoothProfile;
+import android.bluetooth.BluetoothProfile;
+import android.bluetooth.BluetoothSocket;
 import android.content.Context;
 import android.os.Build;
+import android.os.ParcelUuid;
 import android.os.Handler;
 import android.os.Looper;
 import androidx.annotation.Nullable;
@@ -25,6 +28,14 @@ import com.facebook.react.modules.core.RCTNativeAppEventEmitter;
 
 import org.json.JSONException;
 
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.lang.reflect.Array;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.Map;
@@ -52,6 +63,7 @@ public class Peripheral extends BluetoothGattCallback {
 	private ReactContext reactContext;
 
 	private BluetoothGatt gatt;
+	private BluetoothSocket bluetoothSocket;
 
 	private Callback connectCallback;
 	private Callback retrieveServicesCallback;
@@ -60,6 +72,10 @@ public class Peripheral extends BluetoothGattCallback {
 	private Callback writeCallback;
 	private Callback registerNotifyCallback;
 	private Callback requestMTUCallback;
+
+	private OutputStream outputStream;
+	private InputStream inputStream;
+	private byte[] imageData;
 
 	private List<byte[]> writeQueue = new ArrayList<>();
 
@@ -351,7 +367,7 @@ public class Peripheral extends BluetoothGattCallback {
 				}
 			}
 			Log.d(BleManager.LOG_TAG, "onCharacteristicChanged: " + BleManager.bytesToHex(dataValue)
-					+ " from peripheral: " + device.getAddress());
+					+ " from peripheral: " + device.getAddress() + " :: " + charString);
 			WritableMap map = Arguments.createMap();
 			map.putString("peripheral", device.getAddress());
 			map.putString("characteristic", charString);
@@ -823,6 +839,111 @@ public class Peripheral extends BluetoothGattCallback {
 
 			requestMTUCallback = null;
 		}
+	}
+
+	public void openL2capChannel(final int psm, final Callback callback) {
+		Log.i(TAG, "LE-COC: openL2capChannel" + psm);
+		new Thread( new Runnable() { @Override public void run() {
+			Constructor<BluetoothSocket> constructor;
+			try {
+				if (isL2capChannelOpned()) {
+					closeL2capChannel();
+				}
+				if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
+					constructor = BluetoothSocket.class.getDeclaredConstructor(int.class, int.class,
+									boolean.class, boolean.class, BluetoothDevice.class, int.class, ParcelUuid.class, boolean.class, boolean.class);
+					constructor.setAccessible(true);
+					bluetoothSocket = constructor.newInstance(BluetoothSocket.TYPE_L2CAP, -1, false, false, getDevice(), 0x20000 | psm, null, false, false);
+					Log.i(TAG, "LE-COC: created");
+				} else {
+					bluetoothSocket = getDevice().createInsecureL2capChannel(psm);
+				}
+
+				bluetoothSocket.connect();
+				Log.i(TAG, "LE-COC: connected");
+
+				outputStream = bluetoothSocket.getOutputStream();
+
+				inputStream = bluetoothSocket.getInputStream();
+				callback.invoke(null, "L2cap channel is successfully opened");
+			} catch (Exception ex) {
+				Log.e(TAG, "L2CAP BluetoothSocket Error - " + ex.getMessage());
+				callback.invoke("Couldn't be able to open L2cap channel");
+			}
+		}}).start();
+	}
+	
+	public void readFromStream(byte[] buffer, Callback callback) {
+		// new Thread( new Runnable() { @Override public void run() {
+			Log.i(TAG, "readFromStream - " + buffer);
+			if (inputStream == null) {
+				callback.invoke("No InputStream available");
+				return;
+			}
+			try {
+				int count = inputStream.read(buffer);
+				Log.i(TAG, "readFromStream buffer - " + Array.getInt(buffer, 0));
+				Log.i(TAG, "readFromStream count - " + count);
+				callback.invoke(null, count);
+			} catch(IOException ex) {
+				callback.invoke("Couldn't be able to read from L2cap channel");
+			}
+		// }}).start();
+	}
+
+	public void writeToStream(byte[] data, int par1, int par2, Callback callback) {
+		// new Thread( new Runnable() { @Override public void run() {
+			Log.i(TAG, "writeToStream - $$$$ " + data.length + par1 + par2);
+			if (outputStream == null) {
+				callback.invoke("No OutputStream available");
+				return;
+			}
+			try { 
+				outputStream.write(data, par1, par2);
+				callback.invoke(null, null);
+			} catch(IOException ex) {
+				callback.invoke("Couldn't be able to write to L2cap channel");
+			}
+		// }}).start();
+	}
+
+	public void closeL2capChannel() {
+    try {
+      Thread.sleep(300);
+    } catch (InterruptedException ex) {
+      ex.printStackTrace();
+    }
+
+    if (inputStream != null) {
+      try {
+        inputStream.close();
+      } catch (Exception ex) {
+        ex.printStackTrace();
+      }
+      inputStream = null;
+    }
+
+    if (outputStream != null) {
+      try {
+        outputStream.close();
+      } catch (Exception ex) {
+        ex.printStackTrace();
+      }
+      outputStream = null;
+    }
+
+    if (bluetoothSocket != null) {
+      try {
+        bluetoothSocket.close();
+      } catch (Exception ex) {
+        ex.printStackTrace();
+      }
+      bluetoothSocket = null;
+    }
+	}
+
+	public boolean isL2capChannelOpned() {
+		return bluetoothSocket != null ? bluetoothSocket.isConnected() : false;
 	}
 
 	// Some peripherals re-use UUIDs for multiple characteristics so we need to
